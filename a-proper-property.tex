@@ -138,7 +138,7 @@
 \newcommand{\this}{\code{this}\xspace}
 \newcommand{\self}{\code{self}\xspace}
 \newcommand{\cvref}{\emph{cv-ref qualifiers}\xspace}
-\newcommand{\nl}{\vspace{\baselineskip}}
+\newcommand{\nl}{\vspace{0.2\baselineskip}}
 
 \title{A Proper Property\\
        \cplusplus Gymnastics with Partially Defined Types}
@@ -170,95 +170,242 @@
 \section{Disclaimer}
 
 \begin{frame}
-  \frametitle{Disclaimer}
-  The opinions in this talk are my own, and do not necessarily reflect the
-  opinions of Citadel LLC or any of its subsidiaries.\nl
-  
-  In addition, no Citadel resources were used in the development of this talk.
+\frametitle{Disclaimer}
+The opinions in this talk are my own, and do not necessarily reflect the
+opinions of Citadel LLC or any of its subsidiaries.\nl
+
+In addition, no Citadel resources were used in the development of this talk.
 \end{frame}
 
 
 \section{Recap}
 \begin{frame}[fragile]
-  \frametitle{So, What is a Property?}
-  A property pretends to be a field.\nl
-  
-  Assignment:
-  \begin{lstlisting}[language=cpp]
-    airplane.cargo = 5;
-  \end{lstlisting}
 
-  Reading:
-  \begin{lstlisting}[language=cpp]
-    int x = airplane.cargo;
-  \end{lstlisting}
+\frametitle{So, What is a Property?}
+\begin{center}
+{\Large A property pretends to be a field.}
+\end{center}
+
+Assignment:
+\begin{lstlisting}[language=cpp]
+airplane.cargo = "hot air";
+\end{lstlisting}
+
+Reading:
+\begin{lstlisting}[language=cpp]
+Payload x = airplane.cargo;
+\end{lstlisting}
+
+(Aside: we need a payload, and strings do nicely.)
+\begin{lstlisting}[language=cpp]
+// books truly are the greatest gift
+using Payload = std::string;
+using MaybePayload = std::optional<Payload>
+\end{lstlisting}
+
 \end{frame}
 
 
 \begin{frame}[fragile]
-  \frametitle{Totally.}
-  If it quacks like a field, it has to be...
-  
-  \begin{lstlisting}[language=cpp]
-    struct Airplane {
-      int cargo;
-    } airplane;
-  \end{lstlisting}
-  
-  ... a field, right?
+\frametitle{Totally.}
+
+\begin{center}
+If it quacks like a field, it has to be...
+\end{center}
+
+\begin{lstlisting}[language=cpp]
+class Airplane {
+  MaybePayload cargo;
+} airplane;
+\end{lstlisting}
+
+\begin{center}
+... a field, right?
+\end{center}
 \end{frame}
 
 
 \begin{frame}[fragile]
-  \frametitle{Have you heard of this?}
+\frametitle{Have you heard of this?}
 
-  \includegraphics[width=\textwidth]{CargoCultAirplane.jpg}
+\includegraphics[width=\textwidth]{CargoCultAirplane.jpg}
 \end{frame}
 
 
 \begin{frame}[fragile]
-  \frametitle{It is only a shell...}
- 
-  Instead, it's a pair of a Getter and a Setter.
-  \begin{lstlisting}[language=cpp]
-struct Airplane {
+\frametitle{It is only a shell...}
+
+\begin{center}
+Instead, it's a pair of a Getter and a Setter on a member.
+\end{center}
+\begin{lstlisting}[language=cpp]
+class Airplane {
   struct Cargo {
-    operator int() const { /* getter */
-      return 0;
+    // Setter - assignment from Payload
+    void operator=(Payload crate) {
+      return {};
     }
-    int operator=(int y) { /* setter */
-      return 0;
+    // Getter - implicit conversion to Payload
+    operator Payload() const {
+      return {};
     }
   };
-
   Cargo cargo;
 } airplane;
+\end{lstlisting}
+\begin{center}
+{\small(We need at least one byte to give \code{cargo} an address)}.
+\end{center}
+\end{frame}
+
+\section{The Problem}
+
+\begin{frame}[fragile]
+  \frametitle{Let's Get More Interesting}
+\begin{lstlisting}[language=cpp]
+class Airplane {
+  MaybePayload `hold`;
+public: @\pause@
+  struct Cargo {
+    MaybePayload operator=(Payload crate) {
+      if (!`hold`) {
+        @@`hold` = std::move(crate); return {};
+      }
+      return {std::move(crate)};
+    }@\pause@
+    operator MaybePayload() {
+      return std::exchange(`hold`, {});
+    } @\pause@
+  } cargo;
+} airplane;
+\end{lstlisting}
+\pause
+Pro: this solution is pretty.
+\pause
+
+Con: it is not a solution. {\tiny (It does not compile.)}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{But... We wants it! We needs it, precious!}
+
+\begin{center}
+  {\Huge No.}
+  \vspace{.8 in} 
+
+  You're not getting a second breakfast... I mean, a second \this.
+\end{center}
+\end{frame}
+
+
+\begin{frame}
+  \frametitle{The Problem}
+
+\begin{center}
+  {\Huge Get The Host's \this.} \nl
+
+  ... while being reasonably easy to use.
+\end{center}
+\end{frame}
+
+
+\section{KISS}
+
+\begin{frame}[fragile]
+  \frametitle{Store the \this pointer}
+  \begin{lstlisting}[language=cpp]
+class Airplane {
+  MaybePayload hold;
+public:
+  struct Cargo {
+    MaybePayload operator=(Payload crate) {
+      if (!`host`->hold) {
+        @@`host`->hold = std::move(crate); return {};
+      }
+      return {std::move(crate)};
+    }
+    operator MaybePayload() {
+      return std::exchange(`host`->hold, {});
+    }
+    @@`Airplane* const host`;
+  } cargo;
+  @@`Airplane() : cargo{this} {}` // every. time.
+} airplane;
   \end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{So... How'd we do?}
+\begin{center}
+{\Huge Poorly.}
+\end{center}
+\begin{description}
+  \item[Needs extra space?] Check.
+  \item[Error-prone?] Check.
+  \item[No help from C++?] Check.
+  \item[Easy?] To understand, yes. To maintain? Good luck.
+    (does not pass the WWTDCD\footnote{What Would The Default Constructor Do}
+    test)
+\end{description}
+\end{frame}
+
+
+\section{Solution Criteria}
+\begin{frame}
+  \frametitle{Moving the Goalposts Much?}
+\begin{center}
+{\Huge We need some criteria.}
+\end{center}
 \end{frame}
 
 
 \begin{frame}[fragile]
-  \frametitle{Ta-Da! We're Done, right?}
-
-  No. Need access to the Host's \code{this} pointer.
-  \begin{lstlisting}[language=cpp]
-template <typename Payload>
-struct Airplane {
-  bool cargo_loaded; // can't reload
-  std::optional<Payload> private_cargo;
-  struct Cargo {
-    operator Payload() {
-      return *std::exchange(`private_cargo`, {}};
-    }
-    void operator=(Payload package) {
-      if (!`cargo_loaded`) {
-        @@`cargo_loaded` = true;
-        @@`private_cargo` = std::move(package);
-      }
-    }
-  } cargo;
-} airplane;
-  \end{lstlisting}
+  \frametitle{Criteria}
+  \begin{description}
+    \item[The First Rule of \cplusplus]\pause
+      We only pay for what we use.
+    \item[At Most One Macro Per Property]
+      The generated code must be contiguous.\pause
+    \item[No Pitfalls]
+      \begin{itemize}
+        \item Easy to read
+        \item Easy to write
+        \item Easy to modify
+      \end{itemize}
+  \end{description}
+  \begin{center}
+    Boils down to \emph{Don't repeat yourself.}\footnote{And we had to repeat
+    ourselves with every constructor and assignment operator.}
+  \end{center}
 \end{frame}
+
+
+\section{The Idea}
+
+\begin{frame}[fragile]
+\frametitle{Member Offsets are Constant}
+\begin{center}
+  We already have \code{(Cargo*) this}. We can \textbf{compute}
+  \code{(Airplane*) this}.
+  \includegraphics[width=\textwidth]{offsets.pdf}
+\end{center}
+
+\end{frame}
+
+
+\begin{frame}
+  \frametitle{The Anticlimax}
+\begin{center}
+  I don't think we can get away without macros. \nl \nl \pause
+
+  But, I promise they're not the worst thing about this solution. \nl \nl \pause
+
+  Wait, that's not a good thing. \nl \nl \pause
+
+  ... well, maybe they are.
+\end{center}
+\end{frame}
+
+
 
 \end{document}
