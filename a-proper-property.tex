@@ -139,9 +139,12 @@
 \newcommand{\self}{\code{self}\xspace}
 \newcommand{\cvref}{\emph{cv-ref qualifiers}\xspace}
 \newcommand{\nl}{\vspace{0.2\baselineskip}}
+\newcommand{\HT}{{\Huge T}{\hspace{-5pt}}}
+\newcommand{\HI}{{\Huge I}{\hspace{-1pt}}}
+\newcommand{\HS}{{\Huge S}{\hspace{-1pt}}}
+\newcommand{\HK}{{\Huge K}{\hspace{-1pt}}}
 
-\title{A Proper Property\\
-       \cplusplus Gymnastics with Partially Defined Types}
+\title{A Proper Property}
 \author{Gašper Ažman}
 \date{November 27, 2017}
 
@@ -153,11 +156,11 @@
 \end{frame}
 
 
-\section{About: Author}
+\section{Author}
 \begin{frame}
   \frametitle{About Me}
   \begin{itemize}
-    \item Gašper Ažman
+    \item Gašper Ažman (twitter: @atomgalaxy)
     \item Started teaching \cplusplus in highschool
     \item Did computer vision research at Berkeley
     \item Helped with Amazon Search Infrastructure at a9.com
@@ -268,13 +271,12 @@ class Airplane {
 public: @\pause@
   struct Cargo {
     MaybePayload operator=(Payload crate) {
-      if (!`hold`) {
-        @@`hold` = std::move(crate); return {};
-      }
-      return {std::move(crate)};
+      if (`hold`) return {std::move(crate)};
+      @@`hold` = std::move(crate); return {};
     }@\pause@
-    operator MaybePayload() {
-      return std::exchange(`hold`, {});
+    operator Payload() {
+      if (!`hold`) throw NoPayloadError{};
+      return *std::exchange(`hold`, {});
     } @\pause@
   } cargo;
 } airplane;
@@ -285,6 +287,17 @@ Pro: this solution is pretty.
 
 Con: it is not a solution. {\tiny (It does not compile.)}
 \end{frame}
+
+\begin{frame}
+  \frametitle{But WHY?}
+\begin{center}
+  {\Huge We need (Airplane*) \this}
+  \vspace{.8 in} 
+
+  Not \code{(Cargo*) this}.
+\end{center}
+\end{frame}
+
 
 \begin{frame}[fragile]
   \frametitle{But... We wants it! We needs it, precious!}
@@ -310,29 +323,37 @@ Con: it is not a solution. {\tiny (It does not compile.)}
 
 
 \section{KISS}
+\begin{frame}
+\begin{center}
+  Attempt 1:\nl\nl
+
+  \HK eep \HI t \HS urprisingly \HS imple
+\end{center}
+\end{frame}
+
 
 \begin{frame}[fragile]
-  \frametitle{Store the \this pointer}
-  \begin{lstlisting}[language=cpp]
+\frametitle{Store the \this pointer}
+\begin{lstlisting}[language=cpp]
 class Airplane {
-  MaybePayload hold;
+  MaybePayload `hold`;
 public:
   struct Cargo {
     MaybePayload operator=(Payload crate) {
-      if (!`host`->hold) {
-        @@`host`->hold = std::move(crate); return {};
-      }
-      return {std::move(crate)};
+      if (`host`->hold) return {std::move(crate)};
+      @@`hold` = std::move(crate); return {};
     }
-    operator MaybePayload() {
-      return std::exchange(`host`->hold, {});
+    operator Payload() {
+      if (!`host`->hold) throw NoPayloadError{};
+      return *std::exchange(`hold`, {});
     }
     @@`Airplane* const host`;
   } cargo;
   @@`Airplane() : cargo{this} {}` // every. time.
 } airplane;
-  \end{lstlisting}
+\end{lstlisting}
 \end{frame}
+
 
 \begin{frame}[fragile]
   \frametitle{So... How'd we do?}
@@ -361,26 +382,43 @@ public:
 
 \begin{frame}[fragile]
   \frametitle{Criteria}
-  \begin{description}
-    \item[The First Rule of \cplusplus]\pause
-      We only pay for what we use.
-    \item[At Most One Macro Per Property]
-      The generated code must be contiguous.\pause
-    \item[No Pitfalls]
-      \begin{itemize}
-        \item Easy to read
-        \item Easy to write
-        \item Easy to modify
-      \end{itemize}
-  \end{description}
+  \textbf{The First Rule of \cplusplus}\pause
+
+  We only pay for what we use.\pause\nl\nl\nl
+
+
+  \textbf{At Most One Macro Per Property}
+
+  The generated code must be contiguous.\pause\nl\nl\nl
+
+  \textbf{No Pitfalls}
+  \begin{itemize}
+    \item Easy to read
+    \item Easy to write
+    \item Easy to modify
+  \end{itemize}
+
+  \pause
   \begin{center}
-    Boils down to \emph{Don't repeat yourself.}\footnote{And we had to repeat
-    ourselves with every constructor and assignment operator.}
+    Boils down to \emph{Don't repeat yourself.}
+    
+    And we had to repeat ourselves with every constructor and assignment
+    operator.
   \end{center}
 \end{frame}
 
 
-\section{The Idea}
+\section{A Better Idea}
+
+\begin{frame}[fragile]
+\frametitle{offsetof}
+\begin{center}
+  Attempt 2:\nl\nl
+
+  {\Huge offsetof}
+\end{center}
+\end{frame}
+
 
 \begin{frame}[fragile]
 \frametitle{Member Offsets are Constant}
@@ -388,8 +426,126 @@ public:
   We already have \code{(Cargo*) this}. We can \textbf{compute}
   \code{(Airplane*) this}.
   \includegraphics[width=\textwidth]{offsets.pdf}
-\end{center}
 
+  x86\_64, clang: \code{\&Airplane::cargo} == 32
+\end{center}
+\end{frame}
+
+
+\begin{frame}[fragile]
+\frametitle{Easy Peasy!}
+\begin{center}
+  We have:
+\end{center}
+\begin{lstlisting}[language=cpp]
+
+  auto offset = offsetof(Airplane, cargo);
+  auto fixed  =
+                            this  - offset;
+  auto host   =                             fixed ;
+                  
+ 
+\end{lstlisting}
+\end{frame}
+
+
+\begin{frame}[fragile]
+\frametitle{Now For Something That Actually Works}
+\begin{center}
+  With the casts in:
+\end{center}
+\begin{lstlisting}[language=cpp]
+
+  auto offset = offsetof(Airplane, cargo);
+  auto fixed  =
+    reinterpret_cast<char*>(this) - offset;
+  auto host   = reinterpret_cast<Airplane*>(fixed);
+                    
+ 
+\end{lstlisting}
+\end{frame}
+
+
+\begin{frame}[fragile]
+\frametitle{If You Like It, Put It In A Function}
+\begin{center}
+  With a function around it:
+\end{center}
+\begin{lstlisting}[language=cpp]
+Airplane* get_host() {
+  auto offset = offsetof(Airplane, cargo);
+  auto fixed  =
+    reinterpret_cast<char*>(this) - offset;
+  auto host  = reinterpret_cast<Airplane*>(fixed);
+  return host;
+}
+\end{lstlisting}
+\end{frame}
+
+
+\begin{frame}[fragile]
+\frametitle{But...}
+\begin{center}
+  But, it has warnings!
+\end{center}
+\begin{verbatim}
+offset_of.cpp:34:23: warning: offset of
+  on non-standard-layout type 'Airplane'
+  [-Winvalid-offsetof]
+
+auto offset   = offsetof(Airplane, cargo);
+                ^                  ~~~~~
+\end{verbatim}
+(No, it's not UB, if you're using c++17)
+\end{frame}
+
+
+\begin{frame}[fragile]
+\frametitle{But, Is it... Legal?}
+\begin{center}
+  Turns out this doesn't have a warning, and is \code{constexpr}.
+\end{center}
+\begin{lstlisting}[language=cpp]
+  std::integral_constant<size_t, offsetof(Airplane, cargo)>::value;
+\end{lstlisting}
+\end{frame}
+
+
+\begin{frame}[fragile]
+\frametitle{So... How'd we do?}
+\begin{center}
+  We did OK. For a once-off.\nl\nl
+
+\begin{itemize}
+  \item The getter and setter pair are completely ad-hoc.
+  \item Ad-Hoc \code{get\_host()} function with scary casts.
+\end{itemize}
+
+\end{center}
+\end{frame}
+
+\section{Preview}
+\begin{frame}[fragile]
+\frametitle{How About This?}
+\begin{lstlisting}[language=cpp]
+class Airplane {
+  MaybePayload hold;
+  struct Cargo {
+    template <typename Host>
+    auto set(Host& `host`, Payload payload) const {
+      if (`host.hold`) return {std::move(payload)};
+      @@`host.hold` = std::move(payload); return {};
+    }
+    template <typename Host>
+    auto get(Host& `host`) const {
+      if (!`host.hold`) { throw NoPayloadError{}; }
+      return *std::exchange(`host.hold`, {});
+    }
+  };
+public:
+  @@`LIBPROPERTY_WRAP((Cargo), cargo, Airplane);`
+};
+\end{lstlisting}
 \end{frame}
 
 
@@ -400,12 +556,297 @@ public:
 
   But, I promise they're not the worst thing about this solution. \nl \nl \pause
 
-  Wait, that's not a good thing. \nl \nl \pause
+  Wait, that's not a good thing. \nl \nl \nl \nl \nl \pause
 
   ... well, maybe they are.
 \end{center}
 \end{frame}
 
+
+\begin{frame}[fragile]
+\frametitle{Down The Rabbit-Hole}
+\begin{center}
+  We had:
+\end{center}
+\begin{lstlisting}[language=cpp]
+class Airplane {
+  MaybePayload hold;
+  struct Cargo {
+    void operator=(Payload crate) {
+      auto& host = *Airplane::`get_host(this)`;
+      /* use host.hold */
+    }
+  };
+public:
+  Cargo cargo;
+  static Airplane* `get_host`(Cargo* cargo) {
+    return /* cargo - offsetof(Airplane, cargo); */
+  }
+};
+\end{lstlisting}
+\end{frame}
+
+
+\begin{frame}[fragile]
+\frametitle{But What About Second Cargo?}
+\begin{center}
+  This is pretty doable:
+\end{center}
+\begin{lstlisting}[language=cpp]
+class Airplane {
+  MaybePayload hold;
+  MaybePayload frunk;
+  template <auto managed>
+  struct Cargo {
+    void operator=(Payload crate) {
+      auto& host = `Airplane`::get_host(*this);
+      host.*managed = std::move(crate);
+    }
+  };
+public:
+  Cargo<&Airplane::hold> cargo;
+  static Airplane& `get_host(decltype(cargo)&)`;
+  Cargo<&Airplane::frunk> front_bay; 
+  static Airplane& `get_host(decltype(front_bay)&)`;
+};
+\end{lstlisting}
+\end{frame}
+
+
+\begin{frame}[fragile]
+\frametitle{OK Now?}
+\begin{center}
+  Better, but we still need to:
+\end{center}
+\begin{itemize}
+  \item manually get the host pointer.
+  \item We need at least 3 overloads of \code{get\_host: (const\&, \&, \&\&)}
+    per member.
+  \item We need to manually type \code{Airplane::}
+  \item \code{get\_host()} pollutes the interface of Airplane, and choosing an
+    uglier and less-likely-to-clash name makes our implementation uglier too.
+\end{itemize}
+
+\end{frame}
+
+
+\begin{frame}[fragile]
+\frametitle{In Other News, Stack Corruption.}
+\begin{center}
+  Also, what about this?
+\end{center}
+
+\begin{lstlisting}[language=cpp]
+Airplane airplane;
+auto x = airplane.cargo; // works!
+x = "foo";               // corrupts the stack
+\end{lstlisting}
+\end{frame}
+
+
+\begin{frame}[fragile]
+\frametitle{Fix}
+\begin{lstlisting}[language=cpp]
+  template <auto managed>
+  struct Cargo {
+    @@`friend Airplane`;
+    /* getters, setters */
+    @@`private:`
+    Cargo() = default;
+    Cargo(Cargo const&) = default;
+    Cargo(Cargo&&) = default;
+    Cargo const& operator=(Cargo const&) = default;
+    Cargo&& operator=(Cargo&&) = default;
+    ~Cargo() = default;
+  };
+\end{lstlisting}
+\begin{center}
+  Now only Airplane can manage Cargo.
+\end{center}
+\end{frame}
+
+
+\begin{frame}[fragile]
+\frametitle{... Better.}
+\begin{center}
+  Now Breaks:
+\end{center}
+
+\begin{lstlisting}[language=cpp]
+Airplane airplane;
+// breaks, copy constructor is private.
+auto x = airplane.cargo;
+\end{lstlisting}
+\end{frame}
+
+
+\begin{frame}[fragile]
+\frametitle{Really Though?}
+\begin{center}
+  This is a lot of code. We want to put this into a library.\nl \nl \nl \nl
+
+  It gets to be \emph{a lot more code} when you want return-type deduction,
+  SFINAE, and templates for getters and setters to work correctly.
+\end{center}
+\end{frame}
+
+\section{SIITT}
+\begin{frame}[fragile]
+\frametitle{Store It In The Type}
+\begin{center}
+  Attempt 3:\nl\nl
+
+  \HS tore \HI t \HI n \HT he \HT ype.
+\end{center}
+\end{frame}
+
+
+\begin{frame}[fragile]
+\frametitle{So, What do We Need?}
+\begin{center}
+  We need to wrap our getter/setter provider into an adaptor.
+\end{center}
+\begin{lstlisting}[language=cpp]
+template <typename Property, typename Tag>
+class wrapper {
+  // allow `host` to access self::value
+  friend host;
+  Property value;
+
+  constexpr wrapper()=default;
+  constexpr wrapper(wrapper const&)=default;
+  constexpr wrapper(wrapper&&)=default;
+  ~wrapper()=default;
+  constexpr wrapper& operator=(wrapper const&)=default;
+  constexpr wrapper& operator=(wrapper&&)=default;
+\end{lstlisting}
+\end{frame}
+
+
+\begin{frame}[fragile]
+\frametitle{Setters}
+\begin{lstlisting}[language=cpp]
+template <typename Property, typename Tag>
+class wrapper { /*cont*/
+  /* setter implementation */
+  template <typename X>
+  decltype(auto) operator=(X&& val) & {
+    return value.set(
+        ::libproperty::impl::get_host(*this),
+          std::forward<X>(val));
+  }
+  /* and the const& and && variants */
+\end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile]
+\frametitle{Getters}
+\begin{lstlisting}[language=cpp]
+template <typename Property, typename Tag>
+class wrapper { /*cont*/
+  // SFINAE-detect getter presence
+  // also: you must say it 3 times (Vittorio, thanks!)
+  template <typename V = value_type, // fake params
+            typename H = host,
+            typename = decltype(
+              std::declval<V>().get(
+                std::declval<`H const&`>()))>
+  auto get() `const &` -> decltype(auto)
+  {
+    return value.get(
+      ::libproperty::impl::get_host(*this));
+  }
+  /* and the & and && variants */
+\end{lstlisting}
+\end{frame}
+
+
+\begin{frame}[fragile]
+\frametitle{Implicit Conversions}
+\begin{lstlisting}[language=cpp]
+template <typename Property, typename Tag>
+class wrapper { /*cont*/
+  // SFINAE-detect get() presence...
+  // also: you must say it 3 times (Vittorio, thanks!)
+  /* and the & and && variants */
+  template <typename W = wrapper> // type-dependent
+  operator decltype(
+    std::declval<W const&>().get())() const &
+  {
+    return get();
+  }
+\end{lstlisting}
+\end{frame}
+
+
+\begin{frame}[fragile]
+\frametitle{The Magic Macro}
+\begin{lstlisting}[language=cpp]
+#define LIBPROPERTY_WRAP(type, name, host) \
+  LIBPROPERTY__DECLARE_TAG(name, host);    \
+  ::libproperty::wrapper<                  \
+      LIBPROPERTY__PARENTHESIZED_TYPE type,\
+      host::LIBPROPERTY__TAG_NAME(name)>   \
+      name;                                \
+  static_assert("require semicolon")
+
+#define LIBPROPERTY__DECLARE_TAG(name, host)  \
+  struct _libproperty__##name##_prop_tag {    \
+    using host_type = host;                   \
+    auto static constexpr offset()            \
+    {                                         \
+      return std::integral_constant<size_t,   \
+        offsetof(host, name)>{};              \
+    }                                         \
+  };                                          \
+  static_assert("require semicolon")
+\end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile]
+\frametitle{That's it!}
+\begin{center}
+  There are a few helpers to ferry data to-and-fro.\nl\nl\nl
+
+  The trick is really in defining the tag type *outside* the property, so we can
+  reuse our wrapper. \nl\nl\nl
+
+  The \emph{other} trick is doing the \code{offsetof} inside an
+  \code{auto}-typed constxpr function that returns an integral
+  constant.\nl\nl\nl
+
+  This defers lookup until all the types of all data members are known.
+\end{center}
+\end{frame}
+
+
+\begin{frame}[fragile]
+\frametitle{So, This Works!}
+\begin{center}
+  We have avoided many, many hours of "you can't do this because the type isn't
+  defined yet" with this path.\nl\nl\nl
+
+  Libproperty has a lot more cool features:
+\end{center}
+\begin{itemize}
+  \item You can get the host pointer as a universal reference, and thus only
+    have to write one getter template.
+  \item The host is specified once, in the macro.
+  \item You can store the value *in* the Cargo object. We could do that here
+    too, and avoided the space penalty, but there are pitfalls.
+  \item If you want comparisons with strings to work, you need to overload all
+    of them - the library forwards those for you.
+\end{itemize}
+\end{frame}
+
+\section{FIN}
+
+\begin{frame}[fragile]
+\frametitle{Questions?}
+\begin{center}
+  {\Huge Thank You.}
+\end{center}
+\end{frame}
 
 
 \end{document}
