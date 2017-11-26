@@ -1,13 +1,13 @@
 
 NULL:=
-CXX=clang++
+CXX=/Users/atomicity/llvm/llvm-lto-install/bin/clang++
 CXXFLAGS=\
 				 -std=c++17 \
 				 -pedantic \
 				 -fsanitize=undefined \
 				 -fsanitize=address \
 				 -stdlib=libc++ \
-				 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.13.sdk \
+#				 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.13.sdk \
 				 $(NULL)
 
 INKSCAPE=/Applications/Inkscape.app/Contents/Resources/bin/inkscape

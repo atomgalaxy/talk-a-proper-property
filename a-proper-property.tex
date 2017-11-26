@@ -191,19 +191,18 @@ In addition, no Citadel resources were used in the development of this talk.
 
 Assignment:
 \begin{lstlisting}[language=cpp]
-airplane.cargo = "hot air";
+airplane.hold = "hot air";
 \end{lstlisting}
 
 Reading:
 \begin{lstlisting}[language=cpp]
-Payload x = airplane.cargo;
+Payload x = airplane.hold;
 \end{lstlisting}
 
 (Aside: we need a payload, and strings do nicely.)
 \begin{lstlisting}[language=cpp]
 // books truly are the greatest gift
 using Payload = std::string;
-using MaybePayload = std::optional<Payload>
 \end{lstlisting}
 
 \end{frame}
@@ -218,7 +217,7 @@ If it quacks like a field, it has to be...
 
 \begin{lstlisting}[language=cpp]
 class Airplane {
-  MaybePayload cargo;
+  Payload hold;
 } airplane;
 \end{lstlisting}
 
@@ -253,11 +252,11 @@ class Airplane {
       return {};
     }
   };
-  Cargo cargo;
+  Cargo `hold`;
 } airplane;
 \end{lstlisting}
 \begin{center}
-{\small(We need at least one byte to give \code{cargo} an address)}.
+{\small(We need at least one byte to give the \code{hold} an address)}.
 \end{center}
 \end{frame}
 
@@ -267,18 +266,19 @@ class Airplane {
   \frametitle{Let's Get More Interesting}
 \begin{lstlisting}[language=cpp]
 class Airplane {
-  MaybePayload `hold`;
+  bool `hatch_closed`;
 public: @\pause@
   struct Cargo {
-    MaybePayload operator=(Payload crate) {
-      if (`hold`) return {std::move(crate)};
-      @@`hold` = std::move(crate); return {};
+    Payload payload;
+    void operator=(Payload crate) {
+      if (`hatch_closed`) throw ClosedError{};
+      payload = std::move(crate);
     }@\pause@
-    operator Payload() {
-      if (!`hold`) throw NoPayloadError{};
-      return *std::exchange(`hold`, {});
+    operator Payload const&() const {
+      if (`hatch_closed`) throw ClosedError{};
+      return payload;
     } @\pause@
-  } cargo;
+  } hold;
 } airplane;
 \end{lstlisting}
 \pause
@@ -336,20 +336,21 @@ Con: it is not a solution. {\tiny (It does not compile.)}
 \frametitle{Store the \this pointer}
 \begin{lstlisting}[language=cpp]
 class Airplane {
-  MaybePayload `hold`;
+  bool hatch_closed;
 public:
   struct Cargo {
-    MaybePayload operator=(Payload crate) {
-      if (`host`->hold) return {std::move(crate)};
-      @@`hold` = std::move(crate); return {};
+    Payload payload;
+    void operator=(Payload crate) {
+      if (`host->hatch_closed`) throw ClosedError{};
+      payload = std::move(crate);
     }
-    operator Payload() {
-      if (!`host`->hold) throw NoPayloadError{};
-      return *std::exchange(`hold`, {});
+    operator Payload const&()  const {
+      if (`host->hatch_closed`) throw ClosedError{};
+      return payload;
     }
-    @@`Airplane* const host`;
-  } cargo;
-  @@`Airplane() : cargo{this} {}` // every. time.
+    @@`Airplane* host`;
+  } hold;
+  @@`Airplane() : hold{this} {}` // every. time.
 } airplane;
 \end{lstlisting}
 \end{frame}
@@ -427,7 +428,7 @@ public:
   \code{(Airplane*) this}.
   \includegraphics[width=\textwidth]{offsets.pdf}
 
-  x86\_64, clang: \code{\&Airplane::cargo} == 32
+  x86\_64, clang: \code{\&Airplane::hold} == 8
 \end{center}
 \end{frame}
 
@@ -438,13 +439,12 @@ public:
   We have:
 \end{center}
 \begin{lstlisting}[language=cpp]
-
-  auto offset = offsetof(Airplane, cargo);
+//
+  auto offset = offsetof(Airplane, hold);
   auto fixed  =
                             this  - offset;
   auto host   =                             fixed ;
-                  
- 
+// 
 \end{lstlisting}
 \end{frame}
 
@@ -455,13 +455,12 @@ public:
   With the casts in:
 \end{center}
 \begin{lstlisting}[language=cpp]
-
-  auto offset = offsetof(Airplane, cargo);
+//
+  auto offset = offsetof(Airplane, hold);
   auto fixed  =
     reinterpret_cast<char*>(this) - offset;
   auto host   = reinterpret_cast<Airplane*>(fixed);
-                    
- 
+// 
 \end{lstlisting}
 \end{frame}
 
@@ -473,11 +472,10 @@ public:
 \end{center}
 \begin{lstlisting}[language=cpp]
 Airplane* get_host() {
-  auto offset = offsetof(Airplane, cargo);
+  auto offset = offsetof(Airplane, hold);
   auto fixed  =
     reinterpret_cast<char*>(this) - offset;
-  auto host  = reinterpret_cast<Airplane*>(fixed);
-  return host;
+  return        reinterpret_cast<Airplane*>(fixed);
 }
 \end{lstlisting}
 \end{frame}
@@ -493,8 +491,8 @@ offset_of.cpp:34:23: warning: offset of
   on non-standard-layout type 'Airplane'
   [-Winvalid-offsetof]
 
-auto offset   = offsetof(Airplane, cargo);
-                ^                  ~~~~~
+auto offset   = offsetof(Airplane, hold);
+                ^                  ~~~~
 \end{verbatim}
 (No, it's not UB, if you're using c++17)
 \end{frame}
@@ -503,11 +501,24 @@ auto offset   = offsetof(Airplane, cargo);
 \begin{frame}[fragile]
 \frametitle{But, Is it... Legal?}
 \begin{center}
-  Turns out this doesn't have a warning, and is \code{constexpr}.
+  Turns out this doesn't have a warning, and is better than \code{constexpr}.
 \end{center}
 \begin{lstlisting}[language=cpp]
-  std::integral_constant<size_t, offsetof(Airplane, cargo)>::value;
+  std::integral_constant<size_t,
+    offsetof(Airplane, cargo)>::value;
 \end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Why is this OK?}
+  Because there can never be anything virtual between a member and its
+  \emph{directly enclosing class}.
+
+  Think of a non-\code{virtual} member function. It uses the \this pointer and
+  an offset to get to the member, because there is no vtable. That offset has to
+  be constant.
+
+  What we are doing has no chance of not working.
 \end{frame}
 
 
@@ -529,21 +540,22 @@ auto offset   = offsetof(Airplane, cargo);
 \frametitle{How About This?}
 \begin{lstlisting}[language=cpp]
 class Airplane {
-  MaybePayload hold;
   struct Cargo {
+    Payload payload;
     template <typename Host>
-    auto set(Host& `host`, Payload payload) const {
-      if (`host.hold`) return {std::move(payload)};
-      @@`host.hold` = std::move(payload); return {};
+    void set(`Host& host`, Payload crate) {
+      if (`host.hatch_closed`) raise ClosedError{};
+      payload = std::move(crate);
     }
     template <typename Host>
-    auto get(Host& `host`) const {
-      if (!`host.hold`) { throw NoPayloadError{}; }
-      return *std::exchange(`host.hold`, {});
+    auto const& get(`Host const& host`) const {
+      if (`host.hatch_closed`) raise ClosedError{};
+      return payload;
     }
   };
 public:
-  @@`LIBPROPERTY_WRAP((Cargo), cargo, Airplane);`
+  bool hatch_closed;
+  LIBPROPERTY_WRAP(`(Cargo), hold`, Airplane);
 };
 \end{lstlisting}
 \end{frame}
@@ -566,24 +578,36 @@ public:
 \begin{frame}[fragile]
 \frametitle{Down The Rabbit-Hole}
 \begin{center}
-  We had:
+  With \code{get\_host()}, we had:
 \end{center}
 \begin{lstlisting}[language=cpp]
 class Airplane {
-  MaybePayload hold;
   struct Cargo {
+    Payload payload;
     void operator=(Payload crate) {
       auto& host = *Airplane::`get_host(this)`;
-      /* use host.hold */
+      /* use host.hatch_closed */
     }
   };
 public:
-  Cargo cargo;
+  bool hatch_closed;
+  Cargo hold;
+
   static Airplane* `get_host`(Cargo* cargo) {
     return /* cargo - offsetof(Airplane, cargo); */
   }
 };
 \end{lstlisting}
+\end{frame}
+
+
+\begin{frame}
+  \frametitle{To Make A Macro}
+\begin{center}
+  We need contiguous, repetitive, easily substitutable code.\nl\nl
+
+  Also, \emph{sure, we had one cargo, but...}
+\end{center}
 \end{frame}
 
 
@@ -594,20 +618,22 @@ public:
 \end{center}
 \begin{lstlisting}[language=cpp]
 class Airplane {
-  MaybePayload hold;
-  MaybePayload frunk;
-  template <auto managed>
+  template <auto closed>
   struct Cargo {
+    Payload payload;
     void operator=(Payload crate) {
-      auto& host = `Airplane`::get_host(*this);
-      host.*managed = std::move(crate);
+      auto const& host = Airplane::get_host(*this);
+      if (host.*closed) throw ClosedError{};
+      payload = std::move(crate);
     }
   };
 public:
-  Cargo<&Airplane::hold> cargo;
-  static Airplane& `get_host(decltype(cargo)&)`;
-  Cargo<&Airplane::frunk> front_bay; 
-  static Airplane& `get_host(decltype(front_bay)&)`;
+  bool hold_closed;
+  bool frunk_closed;
+  Cargo<&Airplane::hold_closed> hold;
+  static Airplane& `get_host(decltype(hold)&)`;
+  Cargo<&Airplane::frunk_closed> frunk; 
+  static Airplane& `get_host(decltype(frunk)&)`;
 };
 \end{lstlisting}
 \end{frame}
@@ -625,10 +651,94 @@ public:
   \item We need to manually type \code{Airplane::}
   \item \code{get\_host()} pollutes the interface of Airplane, and choosing an
     uglier and less-likely-to-clash name makes our implementation uglier too.
+  \item What if we only had one hatch?
 \end{itemize}
-
 \end{frame}
 
+
+\section{SIITT}
+\begin{frame}[fragile]
+\frametitle{Store It In The Type}
+\begin{center}
+  Attempt 3:\nl\nl
+
+  \HS tore \HI t \HI n \HT he \HT ype.
+\end{center}
+\end{frame}
+
+
+\begin{frame}[fragile]
+\frametitle{But What About Second Cargo, Reprise?}
+\begin{center}
+  What if there is only one hatch?
+\end{center}
+\begin{lstlisting}[language=cpp]
+class Airplane {
+  template <auto closed>
+  struct Cargo { Payload payload; /* */ };
+public:
+  bool hatch_closed;
+  Cargo<&Airplane::`hatch_closed`> hold;
+  Cargo<&Airplane::`hatch_closed`> frunk;
+  static Airplane& get_host(`decltype(hold)`&);
+  // ERROR: same type
+  static Airplane& get_host(`decltype(frunk)`&);
+};
+\end{lstlisting}
+\end{frame}
+
+
+\begin{frame}[fragile]
+\frametitle{But What About Second Cargo, Reprise II?}
+\begin{center}
+  Type tags to the rescue!
+\end{center}
+\begin{lstlisting}[language=cpp]
+class Airplane {
+  template <auto closed, `typename Tag`>
+  struct Cargo { Payload payload; /* */ };
+public:
+  bool hatch_closed;
+  @@`struct hold_tag`;
+  Cargo<&Airplane::hatch_closed, `hold_tag`> hold;
+  @@`struct frunk_tag`;
+  Cargo<&Airplane::hatch_closed, `frunk_tag`> frunk;
+  static Airplane& get_host(`decltype(hold)`&);
+  // Now fine.
+  static Airplane& get_host(`decltype(frunk)`&);
+};
+\end{lstlisting}
+\end{frame}
+
+
+\begin{frame}[fragile]
+\frametitle{Type Tags Are Awesome?}
+\begin{center}
+  But wait, there's more!
+\end{center}
+\begin{lstlisting}[language=cpp]
+class Airplane {
+  template <auto closed, `typename Tag`>
+  struct Cargo { Payload payload; /* */ };
+public:
+  bool hatch_closed;
+  @@`struct hold_tag` {
+    static auto offset_of() {
+      // Airplane is fully defined, unless it isn't
+      // when *called*
+      return std::integral_constant<size_t,
+        offsetof(Airplane, hold)>{};
+    }
+  };
+  Cargo<&Airplane::hatch_closed, `hold_tag`> hold;
+  struct frunk_tag { /* same as above */ };
+  Cargo<&Airplane::hatch_closed, `frunk_tag`> frunk;
+};
+\end{lstlisting}
+\end{frame}
+
+
+\section{Synthesis}
 
 \begin{frame}[fragile]
 \frametitle{In Other News, Stack Corruption.}
@@ -679,7 +789,6 @@ auto x = airplane.cargo;
 \end{lstlisting}
 \end{frame}
 
-
 \begin{frame}[fragile]
 \frametitle{Really Though?}
 \begin{center}
@@ -689,17 +798,6 @@ auto x = airplane.cargo;
   SFINAE, and templates for getters and setters to work correctly.
 \end{center}
 \end{frame}
-
-\section{SIITT}
-\begin{frame}[fragile]
-\frametitle{Store It In The Type}
-\begin{center}
-  Attempt 3:\nl\nl
-
-  \HS tore \HI t \HI n \HT he \HT ype.
-\end{center}
-\end{frame}
-
 
 \begin{frame}[fragile]
 \frametitle{So, What do We Need?}

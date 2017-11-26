@@ -5,6 +5,7 @@
    xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
    xmlns:svg="http://www.w3.org/2000/svg"
    xmlns="http://www.w3.org/2000/svg"
+   xmlns:xlink="http://www.w3.org/1999/xlink"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
    viewBox="-2.497502326965332 18.981016159057617 536.9630737304688 301.6983337402344"
@@ -90,7 +91,7 @@
      x="190.369"
      y="100.979"
      style="font-size:42.5px;font-family:sans-serif;white-space:pre;fill:#333333"
-     id="text3765">MaybePayload</text>
+     id="text3765" />
   <text
      x="191.59"
      y="248.103"
@@ -110,10 +111,10 @@
      y2="112.38760375976562"
      id="line3773" />
   <line
-     style="stroke: rgb(0, 0, 0);"
+     style="stroke:#000000"
      x1="182.241"
      y1="204.433"
-     x2="508.003"
+     x2="508.00299"
      y2="204.433"
      id="line3775" />
   <path
@@ -122,4 +123,35 @@
      id="path3787"
      inkscape:connector-curvature="0"
      sodipodi:nodetypes="cc" />
+  <text
+     xml:space="preserve"
+     style="font-style:normal;font-weight:normal;font-size:40px;line-height:125%;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+     x="193.5025"
+     y="89.679352"
+     id="text28"><tspan
+       sodipodi:role="line"
+       id="tspan26"
+       x="193.5025"
+       y="89.679352">hatch_closed</tspan></text>
+  <text
+     xml:space="preserve"
+     style="font-style:normal;font-weight:normal;font-size:40px;line-height:125%;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+     x="198.5025"
+     y="171.67935"
+     id="text32"><tspan
+       sodipodi:role="line"
+       id="tspan30"
+       x="198.5025"
+       y="171.67935">padding</tspan></text>
+  <image
+     y="103.17935"
+     x="183.5025"
+     id="image51"
+     xlink:href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAUYAAAABCAYAAACi/QeQAAAABHNCSVQICAgIfAhkiAAAAB5JREFU
+OI3twQEBACAAwyCM9P6tLKBFBgdPkgRsux8dEwKGzR/KvQAAAABJRU5ErkJggg==
+"
+     style="image-rendering:optimizeSpeed"
+     preserveAspectRatio="none"
+     height="1"
+     width="326" />
 </svg>
