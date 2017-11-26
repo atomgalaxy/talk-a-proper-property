@@ -727,7 +727,7 @@ public:
       // Airplane is fully defined, unless it isn't
       // when *called*
       return std::integral_constant<size_t,
-        offsetof(Airplane, hold)>{};
+        `offsetof(Airplane, hold)`>{};
     }
   };
   Cargo<&Airplane::hatch_closed, `hold_tag`> hold;
@@ -843,13 +843,14 @@ class wrapper { /*cont*/
 template <typename Property, typename Tag>
 class wrapper { /*cont*/
   // SFINAE-detect getter presence
+  // Defer to call time by making type dependent
   // also: you must say it 3 times (Vittorio, thanks!)
   template <typename V = value_type, // fake params
             typename H = host,
-            typename = decltype(
+            bool nxc = noexcept(
               std::declval<V>().get(
                 std::declval<`H const&`>()))>
-  auto get() `const &` -> decltype(auto)
+  auto get() `const &` noexcept(nxc) -> decltype(auto) 
   {
     return value.get(
       ::libproperty::impl::get_host(*this));
