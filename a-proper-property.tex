@@ -947,5 +947,28 @@ class wrapper { /*cont*/
 \end{center}
 \end{frame}
 
+\section{}
+\begin{frame}[fragile]
+\frametitle{BONUS SLIDES}
+\begin{center}
+  I promised casting zero to stupid things.\nl\nl
+  
+  This code actually used to be in the library:
+\end{center}
+
+\begin{lstlisting}[language=cpp]
+template <typename Host,
+  typename PointerToMemberType>
+auto constexpr offset_of(
+    PointerToMemberType member_ptr) {
+  return reinterpret_cast<std::size_t>(
+    @@`&((Host*)0->*member_ptr)`);
+}
+\end{lstlisting}
+
+It works. It's not \code{constexpr}, but it works with partially defined types,
+and \code{offsetof} didn't use to before C++17 (at least in clang and gcc).
+\end{frame}
+
 
 \end{document}
